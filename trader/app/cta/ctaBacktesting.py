@@ -1,6 +1,8 @@
 """Backtesting Objects"""
 
 import numpy as np
+import pymongo
+from trader.JaxTools import output
 
 class backtestingEngine(object):
     BAR_MODE = "Bar Mode"
@@ -10,17 +12,29 @@ class backtestingEngine(object):
     #################################################
     def __init__(self,settings={}):
         #Basic Configurations
-        self.mode = None
-        
+        self.mode = None                #Tick or Bar MODE
+        self.symbol = None              #Trading target
+        self.dbName = None                  #Target Database
+        self.collectionName = None          #Target Collection
+
         #Infrastructures
-        self.dbCursor = None
+        self.dbClient = None
+        self.db = None
+        self.collection = None
+        self.dbCursor_init = None
+        self.dbCursor_backtest = None
 
         #Trader
-        self.backtestingDate = None
-        self.initDate = None
+        self.backtestingStartDate = None
+        self.backtestingEndDate = None
+        self.initStartDate = None
+        self.initEndDate = None
+        self.strategyName = None
+        self.strategy = None
 
         #Trading
-        self.
+        self.trading = False
+        
         #Others
         self.mustHave=["mode",'backtesting']
 
@@ -30,7 +44,7 @@ class backtestingEngine(object):
         #Pass in the checkList, then check wether all parameters in the checklist has been specified.
         for var in self.mustHave:
             missingList = []
-            if var == None:
+            if getattr(self,var) == None:
                 missingList.append(var)
         if len(missingList) != 0:
             print("Not Completely Setup, missing parameters %s"%(missingList))
@@ -38,7 +52,34 @@ class backtestingEngine(object):
         else:
             print("All necessary parameter have been specified!")
     
+    def setup_db(self):
+        #Connect to Mongodb
+        print("Connecting db...")
+        self.dbClient = pymongo.MongoClient("Localhost",27017)
+        print('Connected to Mongodb, Host: Localhost, Port: 27017')
+        
+        #Set dbcursors
+        self.db = self.dbClient[self.dbName]
+        self.collection = self.db[self.collectionName]
+        self.dbCursor_init = self.collection.find_many({"Date":{"$gte":int(self.initStartDate),"$lte":int(self.initEndDate)}})
+        self.dbCursor_backtest = self.collection.find_many({"Date":{"$gte":int(self.backtestingStartDate),"$lte":int(self.backtestingEndDate)}})
+        print("successfully setup db cursors.")
+
     def runBacktesting(self):
         #First check the parameters' completion.
         self.check_setup()
-        
+        self.setup_db()
+        if self.mode == self.BAR_MODE:
+            func = self.newBar
+        elif self.mode == self.TICK_MODE:
+            func = self.newTick
+
+        print("Start Backtesting.....")
+        self.trading = True
+        print("Initing Strategy...")
+        for initBar in self.dbCursor_init:
+            self.strategy.onInitBar(initBar)
+        print("Strategy Inited!")
+        output("Start replaying data...")
+        for bar in self.dbCursor_backtest:
+            self.strategy.onBar(bar)
