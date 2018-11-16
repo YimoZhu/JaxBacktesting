@@ -26,3 +26,8 @@ ORDERTYPE_BUY = "Buy"
 ORDERTYPE_SELL = "Sell"
 ORDERTYPE_SHORT = "Short"
 ORDERTYPE_COVER = "Cover"
+
+#Feedback
+FEEDBACK_LIMITORDERSENT = "Order sent"
+FEEDBACK_STOPORDERBURIED = "Stop order buried"
+FEEDBACK_ORDERFAILURE = "Failure to send or bury the order!"

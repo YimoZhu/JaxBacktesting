@@ -2,6 +2,8 @@ from collections import OrderedDict
 from trader.JaxTools import appendTime
 from trader.JaxConstant import *
 
+
+
 class info_tracker(object):
     """
     Keep tracking all the trading infos for an engine.
@@ -40,7 +42,20 @@ class info_tracker(object):
         elif self.frequency == FREQUENCY_INTERDAY:
             self.logger.append(appendTime("Sending a new limit order TYPE *%s*, order ID %s, price: %s, volume: %s"%(order.orderType,order.orderID,order.price,order.volume)))
     
+    def newStopOrder(self,so):
+        #Track the info of sending a new stop order
+        self.stopOrderDict[so.soID] = so
+        if self.frequency == FREQUENCY_INNERDAY:
+            self.logger.append(appendTime("Burying a new stop order TYPE *%s* at time %s, order ID %s, price: %s, volume: %s"%(so.orderType,so.datetimeCreated.time(),so.soID,so.price,so.volume))) 
+        elif self.frequency == FREQUENCY_INTERDAY:
+            self.logger.append(appendTime("Burying a new stop order TYPE *%s*, order ID %s, price: %s, volume: %s"%(so.offset,so.orderID,so.price,so.volume)))
+    
+    def orderFailure(self,dateTime):
+        #Track the info of failure sending an order
+        self.logger.append(appendTime("Fail to send an order at datetime %s"%dateTime))
 
+
+##########################################################################################################
 class limitOrder(object):
     #Characterizing a limit order
     def __init__(self,settings_bounded={},settings_extended={}):
@@ -70,6 +85,7 @@ class limitOrder(object):
         self.__dict__.update(settings_extended)
 
 
+########################################################################################################
 class stopOrder(object):
     #characterizing a local stop order.
     def __init__(self,settings_bounded={},settings_extended={}):
@@ -86,6 +102,7 @@ class stopOrder(object):
         self.status = SOSTATUS_NONTRIGGERED
         self.direction = None
         self.offset = None        
+        self.orderType = None
         
         update = {}
         for field in self.__dict__:
