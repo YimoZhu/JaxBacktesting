@@ -5,6 +5,7 @@ import pymongo
 from trader.JaxTools import output
 from datetime import datetime
 from collections import OrderedDict
+from trader.JaxConstant import *
 
 class backtestingEngine(object):
     BAR_MODE = "Bar Mode"
@@ -43,8 +44,8 @@ class backtestingEngine(object):
         self.datetime = None
         self.date = None
         self.time = None
-        self.workingStopOrdersdict = OrderedDict()
-        self.workingLimitOrdersD
+        self.workingStopOrdersDict = OrderedDict()
+        self.workingLimitOrdersDict = OrderedDict()
         #Others
         self.mustHave=["mode",'backtesting']
 
@@ -111,3 +112,7 @@ class backtestingEngine(object):
         self.triggerStopOrders()
 
     def triggerStopOrders(self):
+        """The logic to corss previously buried local stop oders"""
+
+
+    def sendOrders(self,)
