@@ -27,8 +27,8 @@ class backtestingEngine(object):
         self.collection = None
         self.dbCursor_init = None
         self.dbCursor_backtest = None
-        self.tracker = info_traker()
-        self.frequency = None
+        self.tracker = info_tracker()
+        self.__frequency = None
 
         #Trader
         self.backtestingStartDate = None
@@ -60,19 +60,22 @@ class backtestingEngine(object):
                 pass
         self.__dict__.update(update)
         self.__dict__.update(settings_extended)
-    
+
+        self.tracker.frequency = self.__frequency
+
     @property
     def frequency(self):
-        return self.frequency
-    def frequency.setter(self,value):
-        self.frequency = value
+        return self.__frequency
+    @frequency.setter
+    def frequency(self,value):
+        self.__frequency = value
         self.tracker.frequency = value
 
-    def check_setup(self,checkList=self.mustHave):
+    def check_setup(self,checkList):
         #Pass in the checkList, then check wether all parameters in the checklist has been specified.
         for var in self.mustHave:
             missingList = []
-            if getattr(self,var) == None:
+            if var not in self.__dict__:
                 missingList.append(var)
         if len(missingList) != 0:
             print("Not Completely Setup, missing parameters %s"%(missingList))
@@ -95,7 +98,7 @@ class backtestingEngine(object):
 
     def runBacktesting(self):
         #First check the parameters' completion.
-        self.check_setup()
+        self.check_setup(self.mustHave)
         self.setup_db()
         if self.mode == self.BAR_MODE:
             func = self.newBar
@@ -156,3 +159,4 @@ class backtestingEngine(object):
             self.workingLimitOrdersDict[order.orderID] = order
             #Add tracking infos
             self.tracker.newLimitOrder(order)
+            

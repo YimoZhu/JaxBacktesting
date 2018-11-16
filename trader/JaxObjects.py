@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from trader.JaxTools import appendTime
-from JaxConstant import *
+from trader.JaxConstant import *
 
 class info_tracker(object):
     """
@@ -36,7 +36,7 @@ class info_tracker(object):
         #Track the info of sending a new limit order
         self.limitOrderDict[order.orderID] = order
         if self.frequency == FREQUENCY_INNERDAY:
-            self.logger.append(appendTime("Sending a new limit order at time %s, order ID %s, price: %s, volume: %s"%(order.datetimeCreated.time(),order.orderID,order.price,order.volume))
+            self.logger.append(appendTime("Sending a new limit order at time %s, order ID %s, price: %s, volume: %s"%(order.datetimeCreated.time(),order.orderID,order.price,order.volume))) 
         elif self.frequency == FREQUENCY_INTERDAY:
             self.logger.append(appendTime("Sending a new limit order, order ID %s, price: %s, volume: %s"%(order.orderID,order.price,order.volume)))
     
