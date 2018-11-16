@@ -36,9 +36,9 @@ class info_tracker(object):
         #Track the info of sending a new limit order
         self.limitOrderDict[order.orderID] = order
         if self.frequency == FREQUENCY_INNERDAY:
-            self.logger.append(appendTime("Sending a new limit order at time %s, order ID %s, price: %s, volume: %s"%(order.datetimeCreated.time(),order.orderID,order.price,order.volume))) 
+            self.logger.append(appendTime("Sending a new limit order TYPE *%s* at time %s, order ID %s, price: %s, volume: %s"%(order.orderType,order.datetimeCreated.time(),order.orderID,order.price,order.volume))) 
         elif self.frequency == FREQUENCY_INTERDAY:
-            self.logger.append(appendTime("Sending a new limit order, order ID %s, price: %s, volume: %s"%(order.orderID,order.price,order.volume)))
+            self.logger.append(appendTime("Sending a new limit order TYPE *%s*, order ID %s, price: %s, volume: %s"%(order.orderType,order.orderID,order.price,order.volume)))
     
 
 class limitOrder(object):
@@ -55,8 +55,38 @@ class limitOrder(object):
         self.price = None
         self.volume = None
         self.volumeTraded = None
-        self.status = None
+        self.status = STATUS_NONTRADED
+        self.direction = None
+        self.offset = None
+        self.orderType = None
+        
+        update = {}
+        for field in self.__dict__:
+            try:
+                update[field] = settings_bounded[field]
+            except:
+                pass
+        self.__dict__.update(update)
+        self.__dict__.update(settings_extended)
 
+
+class stopOrder(object):
+    #characterizing a local stop order.
+    def __init__(self,settings_bounded={},settings_extended={}):
+        self.symbol = None
+        self.exchange = None
+        self.strategy = None
+        self.soID = None
+
+        self.datetimeCreated = None
+        self.datetimeTriggered = None
+
+        self.price = None
+        self.volume = None
+        self.status = SOSTATUS_NONTRIGGERED
+        self.direction = None
+        self.offset = None        
+        
         update = {}
         for field in self.__dict__:
             try:

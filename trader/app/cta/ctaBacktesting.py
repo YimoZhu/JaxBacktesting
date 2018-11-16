@@ -6,7 +6,7 @@ from trader.JaxTools import output
 from datetime import datetime
 from collections import OrderedDict
 from trader.JaxConstant import *
-from trader.JaxObjects import info_tracker,limitOrder
+from trader.JaxObjects import info_tracker,limitOrder,stopOrder
 
 class backtestingEngine(object):
     BAR_MODE = "Bar Mode"
@@ -140,7 +140,7 @@ class backtestingEngine(object):
         """The logic to corss previously buried local stop oders"""
 
 
-    def sendOrders(self,price,volume,stop=False):
+    def sendOrders(self,price,volume,orderType,stop=False):
         if stop == False:
             self.limitOrderCount += 1
             #send limitOrder
@@ -150,13 +150,47 @@ class backtestingEngine(object):
             order.exchange = self.exchange
             order.strategy = self.strategy
             order.datetimeCreated = self.datetime
-            order.status = STATUS_NONTRADED
             order.price = price
             order.volume = volume
             order.volume = 0
             order.orderID = self.limitOrderCount
+            if orderType == ORDERTYPE_BUY:
+                order.direction = DIRECTION_LONG
+                order.offset = OFFSET_OPEN
+                order.orderType = ORDERTYPE_BUY
+            elif orderType == ORDERTYPE_SELL:
+                order.direction = DIRECTION_SHORT
+                order.offset = OFFSET_CLOSE
+                order.orderType = ORDERTYPE_SELL
+            elif orderType == ORDERTYPE_SHORT:
+                order.direction = DIRECTION_SHORT
+                order.offset = OFFSET_OPEN
+                order.orderType = ORDERTYPE_SHORT
+            elif orderType == ORDERTYPE_COVER:
+                order.direction = DIRECTION_LONG
+                order.offset = OFFSET_CLOSE
+                order.orderType = ORDERTYPE_COVER
             #Add to workinglimitorder dictionary
             self.workingLimitOrdersDict[order.orderID] = order
             #Add tracking infos
             self.tracker.newLimitOrder(order)
+
+        elif stop == True:
+            self.stopOrderCount += 1
+            #send stopOrder
+            settings = {'soID':self.stopOrderCount,'symbol':self.symbol,'exchange':self.exchange,'strategy':self.strategy,
+                        'datetimeCreated':self.datetime,'price':price,'volume':volume}
+            so = stopOrder(settings_bounded=settings)
+            if orderType == ORDERTYPE_BUY:
+                so.direction = DIRECTION_LONG
+                so.offset = OFFSET_OPEN
+            elif orderType == ORDERTYPE_COVER:
+                so.direction = DIRECTION_LONG
+                so.offset = OFFSET_CLOSE
+            elif orderType ==ORDERTYPE_SELL:
+                so.direction = DIRECTION_SHORT
+                so.offset = OFFSET_CLOSE
+            elif orderType ==ORDERTYPE_SHORT:
+                so.direction = DIRECTION_SHORT
+                so.offset = OFFSET_OPEN
             
