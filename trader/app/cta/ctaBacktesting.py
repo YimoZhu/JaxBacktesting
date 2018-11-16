@@ -3,6 +3,8 @@
 import numpy as np
 import pymongo
 from trader.JaxTools import output
+from datetime import datetime
+from collections import OrderedDict
 
 class backtestingEngine(object):
     BAR_MODE = "Bar Mode"
@@ -16,6 +18,7 @@ class backtestingEngine(object):
         self.symbol = None              #Trading target
         self.dbName = None                  #Target Database
         self.collectionName = None          #Target Collection
+        self.frequency = None               #Trading Frequency
 
         #Infrastructures
         self.dbClient = None
@@ -23,6 +26,7 @@ class backtestingEngine(object):
         self.collection = None
         self.dbCursor_init = None
         self.dbCursor_backtest = None
+        self.logger = 
 
         #Trader
         self.backtestingStartDate = None
@@ -34,7 +38,13 @@ class backtestingEngine(object):
 
         #Trading
         self.trading = False
-        
+        self.bar = None
+        self.tick = None
+        self.datetime = None
+        self.date = None
+        self.time = None
+        self.workingStopOrdersdict = OrderedDict()
+        self.workingLimitOrdersD
         #Others
         self.mustHave=["mode",'backtesting']
 
@@ -82,4 +92,22 @@ class backtestingEngine(object):
         print("Strategy Inited!")
         output("Start replaying data...")
         for bar in self.dbCursor_backtest:
-            self.strategy.onBar(bar)
+            func(bar)
+        output("Finished replaying data.")
+        self.trading = False
+
+    def newBar(self,bar):
+        #The logic of handling a new bar.
+        #Updating the date and time.
+        self.bar = bar
+        self.date = bar.Date
+        self.time = bar.time
+        year = self.date%10000
+        month = self.date%100- year*100
+        day = self.date - year*10000 - month*100
+        hour,minute,second = [int(x) for x in self.time.split(':')]
+        self.datetime = datetime(year,month,day,hour,minute,second)
+        #Triggering the local stop orders.
+        self.triggerStopOrders()
+
+    def triggerStopOrders(self):
