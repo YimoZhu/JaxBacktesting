@@ -45,6 +45,7 @@ class backtestingEngine(object):
         self.datetime = None
         self.date = None
         self.time = None
+        self.postition = 0
         self.limitOrderCount = 0
         self.stopOrderCount = 0
         self.workingStopOrdersDict = OrderedDict()
@@ -135,12 +136,42 @@ class backtestingEngine(object):
         self.tracker.newBar(bar)
         #Triggering the local stop orders.
         self.triggerStopOrders()
+        #Cross the newly updated limit orders.
+        self.
+        
+    def newTick(self,tick):
+        #The logic of handling a new tick.
+        pass
 
     def triggerStopOrders(self):
         """The logic to corss previously buried local stop oders"""
+        for soID,so in self.workingLimitOrdersDict.items():
+            if so.direction == DIRECTION_LONG:
+                triggered = (self.bar.High>=so.price)
+            elif so.direction == DIRECTION_SHORT:
+                triggered = (self.bar.Low<=so.price)
+            else:
+                triggered = False
+            if triggered:
+                #If the stop order is triggered
+                so.status = SOSTATUS_TRIGGERED
+                so.datetimeTriggered = self.datetime
+                #Track the new info
+                self.tracker.stopOrderTriggered(so)
+                #Judge the new order
+                if so.offset == OFFSET_CLOSE:
+                    #If the offset is close, then we have to make sure wether there's still nececssity to close the postition
+                    if (self.postition>0 & so.direction == DIRECTION_SHORT)|(self.postition<0 & so.direction == DIRECTION_LONG):
+                        #Then there is still open position we can close
+                        self.sendOrder(so.price,min(so.volume,abs(self.position)),so.orderType)
+                elif so.offset == OFFSET_OPEN:
+                    #If the offset is open, then we can just send the new order out withou check the current position.
+                    self.sendOrder(so.price,so.volume,so.orderType)
+                #Delete the triggered stop order from working dictionary
+                del self.workingStopOrdersDict[so.soID]
 
-
-    def sendOrders(self,price,volume,orderType,stop=False,feedback=False):
+    def sendOrder(self,price,volume,orderType,stop=False,feedback=False):
+        #logic of sending order
         try:
             if stop == False:
                 self.limitOrderCount += 1
@@ -153,7 +184,6 @@ class backtestingEngine(object):
                 order.datetimeCreated = self.datetime
                 order.price = price
                 order.volume = volume
-                order.volume = 0
                 order.orderID = self.limitOrderCount
                 if orderType == ORDERTYPE_BUY:
                     order.direction = DIRECTION_LONG
@@ -213,48 +243,4 @@ class backtestingEngine(object):
                 return FEEDBACK_ORDERFAILURE
             else:
                 pass
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

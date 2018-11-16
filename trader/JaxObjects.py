@@ -54,7 +54,11 @@ class info_tracker(object):
         #Track the info of failure sending an order
         self.logger.append(appendTime("Fail to send an order at datetime %s"%dateTime))
 
-
+    def stopOrderTriggered(self,so):
+        #Track the info of triggering a previous stop order
+        msg = "|%s| The stop order %s is triggered."%(so.datetimeTriggered,so.soID)
+        self.logger.append(appendTime(msg))
+        
 ##########################################################################################################
 class limitOrder(object):
     #Characterizing a limit order
@@ -69,7 +73,7 @@ class limitOrder(object):
         
         self.price = None
         self.volume = None
-        self.volumeTraded = None
+        self.volumeTraded = 0
         self.status = STATUS_NONTRADED
         self.direction = None
         self.offset = None
