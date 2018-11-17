@@ -300,7 +300,7 @@ class backtestingEngine(object):
                 else:
                     pass
         except:
-            info_tracker.orderFailure(self.datetime)
+            self.tracker.orderFailure(self.datetime)
             if feedback == True:
                 return FEEDBACK_ORDERFAILURE
             else:
