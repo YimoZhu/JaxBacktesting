@@ -58,7 +58,7 @@ class info_tracker(object):
         #Track the info of triggering a previous stop order
         msg = "|%s| The stop order %s is triggered."%(so.datetimeTriggered,so.soID)
         self.logger.append(appendTime(msg))
-        
+
 ##########################################################################################################
 class limitOrder(object):
     #Characterizing a limit order
@@ -72,6 +72,7 @@ class limitOrder(object):
         self.datetimeLastTraded = None
         
         self.price = None
+        self.priceTraded = None
         self.volume = None
         self.volumeTraded = 0
         self.status = STATUS_NONTRADED
@@ -108,6 +109,32 @@ class stopOrder(object):
         self.offset = None        
         self.orderType = None
         
+        update = {}
+        for field in self.__dict__:
+            try:
+                update[field] = settings_bounded[field]
+            except:
+                pass
+        self.__dict__.update(update)
+        self.__dict__.update(settings_extended)
+
+
+#########################################################################################
+class trade(object):
+    #Characterizing a trade.
+    def __init__(self,settings_bounded={},settings_extended={}):
+        self.symbol = None
+        self.exchange = None
+        self.strategy = None
+        self.tradeID = None
+
+        self.datetimeCreated = None
+        
+        self.price = None
+        self.volume = None
+        self.direction = None
+        self.offset = None
+
         update = {}
         for field in self.__dict__:
             try:

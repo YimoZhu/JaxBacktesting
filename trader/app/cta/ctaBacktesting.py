@@ -6,7 +6,7 @@ from trader.JaxTools import output
 from datetime import datetime
 from collections import OrderedDict
 from trader.JaxConstant import *
-from trader.JaxObjects import info_tracker,limitOrder,stopOrder
+from trader.JaxObjects import info_tracker,limitOrder,stopOrder,trade
 
 class backtestingEngine(object):
     BAR_MODE = "Bar Mode"
@@ -45,9 +45,11 @@ class backtestingEngine(object):
         self.datetime = None
         self.date = None
         self.time = None
-        self.postition = 0
+        self.position_long = 0
+        self.position_short = 0
         self.limitOrderCount = 0
         self.stopOrderCount = 0
+        self.tradeCount = 0
         self.workingStopOrdersDict = OrderedDict()
         self.workingLimitOrdersDict = OrderedDict()
         #Others
@@ -71,6 +73,10 @@ class backtestingEngine(object):
     def frequency(self,value):
         self.__frequency = value
         self.tracker.frequency = value
+
+    @property
+    def position_net(self):
+        return self.position_long - self.position_short
 
     def check_setup(self,checkList):
         #Pass in the checkList, then check wether all parameters in the checklist has been specified.
@@ -137,8 +143,8 @@ class backtestingEngine(object):
         #Triggering the local stop orders.
         self.triggerStopOrders()
         #Cross the newly updated limit orders.
-        self.
-        
+        self.crossLimitOrders()
+
     def newTick(self,tick):
         #The logic of handling a new tick.
         pass
@@ -161,15 +167,65 @@ class backtestingEngine(object):
                 #Judge the new order
                 if so.offset == OFFSET_CLOSE:
                     #If the offset is close, then we have to make sure wether there's still nececssity to close the postition
-                    if (self.postition>0 & so.direction == DIRECTION_SHORT)|(self.postition<0 & so.direction == DIRECTION_LONG):
-                        #Then there is still open position we can close
-                        self.sendOrder(so.price,min(so.volume,abs(self.position)),so.orderType)
+                    if (self.postition_long>0 & so.direction == DIRECTION_SHORT):
+                        #There is long position in hand
+                        self.sendOrder(so.price,so.volume,orderType=so.orderType)
+                    elif (self.position_short>0 & so.direction == DIRECTION_LONG):
+                        #There is shor position in hand
+                        self.sendOrder(so.price,so.volume,orderType=so.orderType)
                 elif so.offset == OFFSET_OPEN:
                     #If the offset is open, then we can just send the new order out withou check the current position.
                     self.sendOrder(so.price,so.volume,so.orderType)
                 #Delete the triggered stop order from working dictionary
                 del self.workingStopOrdersDict[so.soID]
+    
+    def crossLimitOrders(self):
+        #Cross the working limit orders according to the newly updated infos.
+        buyCrossPrice = self.bar.Low
+        sellCrossPrice = self.bar.High
+        for orderID,order in self.workingLimitOrdersDict.items():
+            buyCrossed = (order.direction == DIRECTION_LONG & order.price >= buyCrossPrice)
+            sellCrossed = (order.direction == DIRECTION_SHORT & order.price <= sellCrossPrice)
 
+            if buyCrossed:
+                price = min(self.bar.Open,order.price)
+                #First update the info of the order.
+                order.priceTraded = price
+                order.status = STATUS_ALLTRADED
+                order.datetimeLastTraded = self.datetime
+                order.volumeTraded = order.volume
+                #Update position
+                if order.offset == OFFSET_OPEN:
+                    self.position_long = self.position_long + order.volume
+                elif order.offset == OFFSET_CLOSE:
+                    self.position_short = self.position_short - order.volume
+                #Then shaping a new trade object.
+                self.tradeCount += 1
+                newTrade = trade(settings_bounded=order.__dict__,
+                                 settings_extended={'tradeID':self.tradeCount,'datetimeCreated':self.datetime,'price':price})
+            elif sellCrossed:
+                price = max(self.bar.Open,order.price)
+                order.priceTraded = price
+                order.status = STATUS_ALLTRADED
+                order.datetimeLastTraded = self.datetime
+                order.volumeTraded = order.volume
+                #Update position
+                if order.offset == OFFSET_OPEN:
+                    self.position_short = self.position_short + order.volume
+                elif order.offset == OFFSET_CLOSE:
+                    self.position_long = self.position_long - order.volume
+                #Shaping a new trade object
+                self.tradeCount += 1
+                newTrade = trade(settings_bounded=order.__dict__,
+                                 settings_extended={'tradeID':self.tradeCount,'datetimeCreated':self.datetime,'price':price})
+           
+            if buyCrossed|sellCrossed:
+                #Keep track of this new trade.
+                self.tracker.newTrade(newTrade)
+                #Delete the working limit order
+                del self.workingLimitOrdersDict[orderID]
+            else:
+                pass
     def sendOrder(self,price,volume,orderType,stop=False,feedback=False):
         #logic of sending order
         try:
@@ -183,7 +239,6 @@ class backtestingEngine(object):
                 order.strategy = self.strategy
                 order.datetimeCreated = self.datetime
                 order.price = price
-                order.volume = volume
                 order.orderID = self.limitOrderCount
                 if orderType == ORDERTYPE_BUY:
                     order.direction = DIRECTION_LONG
@@ -201,6 +256,13 @@ class backtestingEngine(object):
                     order.direction = DIRECTION_LONG
                     order.offset = OFFSET_CLOSE
                     order.orderType = ORDERTYPE_COVER
+                #We should consider bound the close order's volume.
+                if order.offset == ORDERTYPE_SELL:
+                    order.volume = min(self.position_long,volume)
+                elif order.offset == ORDERTYPE_COVER:
+                    order.volume = min(self.position_short,volume)
+                else:
+                    order.volume = volume
                 #Add to workinglimitorder dictionary
                 self.workingLimitOrdersDict[order.orderID] = order
                 #Add tracking infos

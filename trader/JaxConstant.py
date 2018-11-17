@@ -10,10 +10,12 @@ FREQUENCY_INTERDAY = "Inter day"
 STATUS_NONTRADED = 'Nontraded'
 STATUS_PARTIALTRADED = 'Partial traded'
 STATUS_ALLTRADED = 'All traded'
+STATUS_CANCELLED = "cancelled"
 
 #Local Stop Order Status
 SOSTATUS_NONTRIGGERED = "So Nontriggered"
 SOSTATUS_TRIGGERED = "So triggered"
+SOSTATUS_CANCELLED = "So cancelled"
 
 #Offset, Direction and Order types
 OFFSET_OPEN = "Offset Open"
