@@ -21,6 +21,11 @@ class backtestingEngine(object):
         self.dbName = None                  #Target Database
         self.collectionName = None          #Target Collection
 
+        #Product and service
+        self.slippage = 0               #Slippage paid to scalper
+        self.serviceFee = 0             #Service fee paid to scalper
+        self.priceTick = 0              #The smallest change in price
+    
         #Infrastructures
         self.dbClient = None
         self.db = None
@@ -52,6 +57,10 @@ class backtestingEngine(object):
         self.tradeCount = 0
         self.workingStopOrdersDict = OrderedDict()
         self.workingLimitOrdersDict = OrderedDict()
+
+        #Backtesting settings
+        self.capital = 1000000
+
         #Others
         self.mustHave=["mode",'backtesting']
 
@@ -111,7 +120,7 @@ class backtestingEngine(object):
             func = self.newBar
         elif self.mode == self.TICK_MODE:
             func = self.newTick
-
+        
         #Run backtesting
         print("Start Backtesting.....")
         self.trading = True
@@ -132,18 +141,21 @@ class backtestingEngine(object):
         #Updating the date and time.
         self.bar = bar
         self.date = bar.Date
-        self.time = bar.time
+        self.time = bar.Time
         year = self.date%10000
         month = self.date%100- year*100
         day = self.date - year*10000 - month*100
         hour,minute,second = [int(x) for x in self.time.split(':')]
         self.datetime = datetime(year,month,day,hour,minute,second)
+        bar.datetime = self.datetime
         #Tracking the pop up of the new bar.
         self.tracker.newBar(bar)
         #Triggering the local stop orders.
         self.triggerStopOrders()
         #Cross the newly updated limit orders.
         self.crossLimitOrders()
+        #Push the new bar to strategy
+        self.strategy.onBar(bar)
 
     def newTick(self,tick):
         #The logic of handling a new tick.
@@ -167,7 +179,7 @@ class backtestingEngine(object):
                 #Judge the new order
                 if so.offset == OFFSET_CLOSE:
                     #If the offset is close, then we have to make sure wether there's still nececssity to close the postition
-                    if (self.postition_long>0 & so.direction == DIRECTION_SHORT):
+                    if (self.position_long>0 & so.direction == DIRECTION_SHORT):
                         #There is long position in hand
                         self.sendOrder(so.price,so.volume,orderType=so.orderType)
                     elif (self.position_short>0 & so.direction == DIRECTION_LONG):
@@ -226,6 +238,7 @@ class backtestingEngine(object):
                 del self.workingLimitOrdersDict[orderID]
             else:
                 pass
+
     def sendOrder(self,price,volume,orderType,stop=False,feedback=False):
         #logic of sending order
         try:
@@ -270,7 +283,7 @@ class backtestingEngine(object):
                 if feedback == True:
                     return FEEDBACK_LIMITORDERSENT
                 else:
-                    pass
+                    pass 
             elif stop == True:
                 self.stopOrderCount += 1
                 #send stopOrder
