@@ -2,6 +2,9 @@
 class ctaTemplate(object):
     className = "ctaStrategyTemplate"
     author = "Yimo Zhu"
+    STATUS_SLEEPING = "Strategy sleeping"
+    STATUS_INITING = "Strategy initing"
+    STATUS_TRADING = "Strategy trading"
     ###############################################################
     def __init__(self,settings_bounded={},settings_extended={}):
         self.engine = None

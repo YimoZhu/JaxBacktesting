@@ -125,17 +125,17 @@ class backtestingEngine(object):
         print("Start Backtesting.....")
         self.trading = True
 
-        print("Initing Strategy...")
+        output("Initing Strategy...")
         for initBar in self.dbCursor_init:
             self.strategy.onInitBar(initBar)
-        print("Strategy Inited!")
+        output("Strategy Inited!")
 
         output("Start replaying data...")
         for bar in self.dbCursor_backtest:
             func(bar)
         output("Finished replaying data.")
         self.trading = False
-
+        
     def newBar(self,bar):
         #The logic of handling a new bar.
         #Updating the date and time.

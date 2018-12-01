@@ -1,8 +1,8 @@
 from collections import OrderedDict
 from trader.JaxTools import appendTime
 from trader.JaxConstant import *
-
-
+import numpy as np
+import talib
 
 class info_tracker(object):
     """
@@ -156,13 +156,13 @@ class trade(object):
 ########################################################################
 class BarGenerator(object):
     #Aggregating minute bar to k-minutes bar.
-    def __init__(self,freq=5):
+    def __init__(self,freq=5,callBack=lambda x:None,strategy=None):
         self.freq = freq
         self.xminBar = None
         self.bar = None
 
-        self.callBack = lambda x:None
-        self.strategy = None
+        self.callBack = callBack
+        self.strategy = strategy
 
     def onBar(self,bar):
         if self.bar == None:
@@ -181,3 +181,65 @@ class BarGenerator(object):
     def pushXminBar(self,xminBar):
         #Push the x minutes bar to strategy
         self.callBack(xminBar)
+
+
+#########################################################################
+class ArrayManager(object):
+    #Contain a certain length of bar arrays in pure data, and calculate the indicators.
+    def __init__(self,length):
+        #Containers
+        self.openArray = np.empty(length)
+        self.highArray = np.empty(length)
+        self.lowArray = np.empty(length)
+        self.closeArray = np.empty(length)
+
+        #Parameters
+        self.length = length
+        self.leftover = length
+
+        #Flags
+        self.isFilled = False
+    
+    def updateBar(self,bar):
+        #How to update a new bar into containers.
+        if self.isFilled == False:
+            self.openArray[self.length - self.leftover] = bar.Open
+            self.highArray[self.length - self.leftover] = bar.High
+            self.lowArray[self.length - self.leftover] = bar.Low
+            self.closeArray[self.length - self.leftover] = bar.Close
+            self.leftover = self.leftover - 1
+            if self.leftover == 0:
+                self.isFilled = True
+        elif self.isFilled == True:
+            self.openArray[:-1] = self.openArray[1:]
+            self.highArray[:-1] = self.highArray[1:]
+            self.lowArray[:-1] = self.lowArray[1:]
+            self.closeArray[:-1] = self.closeArray[1:]
+            self.openArray[-1] = bar.Open
+            self.highArray[-1] = bar.High
+            self.lowArray[-1] = bar.Low
+            self.closeArray[-1] = bar.Close
+    
+    def sma(self,n,array=False):
+        #Return the n-periods simple moving average.
+        result = tablib.SMA(self.closeArray,n)
+        if array == True:
+            return result
+        else:
+            return result[-1]
+
+    def atr(self,n,array=False):
+        #Return the n-periods average true range.
+        result = talib.ATR(self.highArray,self.lowArray,self.closeArray,n)
+        if array == True:
+            return result
+        else:
+            return result[-1]
+
+    def kingKeltner(self,n,kkdev,array=False):
+        #King keltner tunnel.
+        kkcenter = self.sma(n,array)
+        atr = self.atr(n,array)
+        kkup = kkcenter + kkdev*atr
+        kkdown = kkcenter - kkdev*atr
+        return kkdown,kkcenter,kkup
