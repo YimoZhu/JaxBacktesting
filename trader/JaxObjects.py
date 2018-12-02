@@ -65,7 +65,10 @@ class info_tracker(object):
         self.historyTrade[trade.tradeID] = trade
         msg = "|%s| New trade %s, offset is %s, direction is %s, price %s, volume %s"%(trade.datetimeCreated,trade.tradeID,trade.offset,trade.direction,trade.price,trade.volume)
         self.logger.append(appendTime(msg))
-        
+    
+    def writeLog(self,msg):
+        #Write a log into logger
+        self.logger.append(appendTime(msg))
 
 ##########################################################################################################
 class limitOrder(object):

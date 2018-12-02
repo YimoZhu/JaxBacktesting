@@ -6,8 +6,8 @@ class ctaTemplate(object):
     STATUS_INITING = "Strategy initing"
     STATUS_TRADING = "Strategy trading"
     ###############################################################
-    def __init__(self,settings_bounded={},settings_extended={}):
-        self.engine = None
+    def __init__(self,engine,settings_bounded={},settings_extended={}):
+        self.engine = engine
         self.symbol = None
         self.exchange = None
         self.name = None

@@ -318,4 +318,27 @@ class backtestingEngine(object):
                 return FEEDBACK_ORDERFAILURE
             else:
                 pass
+    
+    def cancelOrder(self,orderID,so=False):
+        #Cancel a limite order or stop order
+        if so == False:
+            if orderID in self.workingLimitOrdersDict:
+                del self.workingLimitOrdersDict[orderID]
+                self.tracker.writeLog("Cancel limit order %s successfully."%orderID)
+            else:
+                self.tracker.writeLog("Trying to cancel a limit order that does not exist.")
+        elif so == True:
+            if orderID in self.workingStopOrdersDict:
+                del self.workingStopOrdersDict[orderID]
+                self.tracker.writeLog("Cancel stop order %s successfully."%orderID)
+            else:
+                self.tracker.writeLog("Trying to cancel a stop that does not exist.")
 
+    def cancelAll(self,limit=True,stop=True):
+        #Cancel all orders
+        if limit == True:
+            for orderID in self.workingLimitOrdersDict:
+                self.cancelOrder(orderID)
+        if stop == True:
+            for soID in self.workingStopOrdersDict:
+                self.cancelOrder(soID,True)
