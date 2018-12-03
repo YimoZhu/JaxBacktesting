@@ -28,7 +28,7 @@ class strategyKingKeltener(ctaTemplate):
 
         #Infrastructure     
         self.bg = BarGenerator(5,self.on5MinBar,self)
-        self.ar = ArrayManager(self.kkLength)
+        self.ar = ArrayManager(self.kkLength+1)
 
         #Flags
         self.status = self.STATUS_SLEEPING
@@ -36,45 +36,52 @@ class strategyKingKeltener(ctaTemplate):
     def onInitBar(self,initBar):
         #How to handel a bar when initing.
         #In this strategy, what we need to do is to calculate the variables.
-        self.status = self.STATUS_INITING
         self.bg.onBar(initBar)
 
     def onBar(self,bar):
         #How to handel a new minute bar when trading.
-        self.status = self.STATUS_TRADING
         self.bg.onBar(bar)
 
     def on5MinBar(self,xBar):
         #How to handel the aggregated 5 minutes bar prompted by the bar generator.
-        self.engine.cancelAll()
-
-        #First we update the variables. When it's promped
-        self.ar.updateBar(xBar)
-        if self.ar.isFilled == False:
-            return None
-        self.kkDown,self.kkCenter,self.kkUp = self.ar.kingKeltner(self.kkLength,self.kkDev)
+        if self.status == self.STATUS_INITING:
+            self.ar.updateBar(xBar)
+            if self.ar.isFilled == False:
+                return None
+            self.kkDown,self.kkCenter,self.kkUp = self.ar.kingKeltner(self.kkLength,self.kkDev)
         
-        #If current position is zero, then send OCO
-        if self.engine.position_net == 0:
-            self.intraTradeHigh = xBar.High
-            self.intraTradeLow = xBar.Low
-            self.sendOCO(self.kkUp,self.kkDown,self.tradeSize)
+        elif self.status == self.STATUS_TRADING:
+            print(self.engine.workingStopOrdersDict)
+            self.engine.cancelAll()
+            print(self.engine.workingStopOrdersDict)
+            #First we update the variables. When it's prompted
+            self.ar.updateBar(xBar)
+            if self.ar.isFilled == False:
+                return None
+            self.kkDown,self.kkCenter,self.kkUp = self.ar.kingKeltner(self.kkLength,self.kkDev)
+            
+            #If current position is zero, then send OCO
+            if self.engine.position_net == 0:
+                self.intraTradeHigh = xBar.High
+                self.intraTradeLow = xBar.Low
+                self.sendOCO(self.kkUp,self.kkDown,self.tradeSize)
 
-        #If current position is positive, then track the price to quit.
-        elif self.engine.position_net > 0 :
-            self.intraTradeHigh = max(xBar.High,self.intraTradeHigh)
-            self.intraTradeLow = min(xBar.Low,self.intraTradeLow)
-            self.engine.sendOrder(self.intraTradeHigh*(1-self.trailingPrcnt/100),
-                                  self.engine.position_net,ORDERTYPE_SELL,True)
-        
-        #If current position is negative, then track the price to quit.
-        elif self.engine.position_net < 0 :
-            self.intraTradeHigh = max(xBar.High,self.intraTradeHigh)
-            self.intraTradeLow = min(xBar.Low,self.intraTradeLow)
-            self.engine.sendOrder(self.intraTradeLow*(1+self.trailingPrcnt/100),
-                                  self.engine.position_net,ORDERTYPE_COVER,True)
+            #If current position is positive, then track the price to quit.
+            elif self.engine.position_net > 0 :
+                self.intraTradeHigh = max(xBar.High,self.intraTradeHigh)
+                self.intraTradeLow = min(xBar.Low,self.intraTradeLow)
+                self.engine.sendOrder(self.intraTradeHigh*(1-self.trailingPrcnt/100),
+                                    self.engine.position_net,ORDERTYPE_SELL,True)
+            
+            #If current position is negative, then track the price to quit.
+            elif self.engine.position_net < 0 :
+                self.intraTradeHigh = max(xBar.High,self.intraTradeHigh)
+                self.intraTradeLow = min(xBar.Low,self.intraTradeLow)
+                self.engine.sendOrder(self.intraTradeLow*(1+self.trailingPrcnt/100),
+                                    self.engine.position_net,ORDERTYPE_COVER,True)
 
     def sendOCO(self,high,low,volume):
         #Send "One Cancel Other" Orders.
         self.engine.sendOrder(high,volume,ORDERTYPE_BUY,True)
         self.engine.sendOrder(low,volume,ORDERTYPE_SHORT,True)
+        print("OCO sent")

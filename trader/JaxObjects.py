@@ -1,6 +1,7 @@
 from collections import OrderedDict
 from trader.JaxTools import appendTime
 from trader.JaxConstant import *
+from datetime import datetime
 import numpy as np
 import talib
 
@@ -31,7 +32,7 @@ class info_tracker(object):
         #Tracking the pop up of a new bar
         self.historyBars.append(bar)
         if hasattr(bar,"Time"):
-            self.logger.append(appendTime("Prompting a new bar, bar datetime %s %s"%(bar.Date,bar.time)))
+            self.logger.append(appendTime("Prompting a new bar, bar datetime %s %s"%(bar.Date,bar.Time)))
         else:
             self.logger.append(appendTime("Prompting a new bar, bar datetime %s"%bar.Date))
 
@@ -71,6 +72,38 @@ class info_tracker(object):
         self.logger.append(appendTime(msg))
 
 ##########################################################################################################
+class barObject(object):
+    #Characterizing a bar object.(ORM)
+    def __init__(self,settings_bounded={},settings_extended={}):
+        self.Open = None
+        self.High = None
+        self.Low = None
+        self.Close = None
+        self.TotalVolume = None
+        self.OpenInterest = None
+        self.Date = None
+        self.Time = None
+        
+        update = {}
+        for field in self.__dict__:
+            try:
+                update[field] = settings_bounded[field]
+            except:
+                pass
+        self.__dict__.update(update)
+        self.__dict__.update(settings_extended)
+
+    @property
+    def datetime(self):
+        #Shaping the datetime
+        year = int((self.Date - self.Date%10000)/10000)
+        month = int((self.Date - self.Date%100)/100- year*100)
+        day = int(self.Date%100)
+        hour,minute,second = [int(x) for x in self.Time.split(':')]
+        return datetime(year,month,day,hour,minute,second)
+
+
+##########################################################################################################
 class limitOrder(object):
     #Characterizing a limit order
     def __init__(self,settings_bounded={},settings_extended={}):
@@ -81,7 +114,8 @@ class limitOrder(object):
 
         self.datetimeCreated = None
         self.datetimeLastTraded = None
-        
+        self.datetimeCancelled = None
+
         self.price = None
         self.priceTraded = None
         self.volume = None
@@ -112,6 +146,7 @@ class stopOrder(object):
 
         self.datetimeCreated = None
         self.datetimeTriggered = None
+        self.datetimeCancelled = None               
 
         self.price = None
         self.volume = None
@@ -225,7 +260,7 @@ class ArrayManager(object):
     
     def sma(self,n,array=False):
         #Return the n-periods simple moving average.
-        result = tablib.SMA(self.closeArray,n)
+        result = talib.SMA(self.closeArray,n)
         if array == True:
             return result
         else:

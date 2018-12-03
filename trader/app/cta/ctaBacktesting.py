@@ -6,7 +6,7 @@ from trader.JaxTools import output
 from datetime import datetime
 from collections import OrderedDict
 from trader.JaxConstant import *
-from trader.JaxObjects import info_tracker,limitOrder,stopOrder,trade
+from trader.JaxObjects import info_tracker,limitOrder,stopOrder,trade,barObject
 
 class backtestingEngine(object):
     BAR_MODE = "Bar Mode"
@@ -62,7 +62,7 @@ class backtestingEngine(object):
         self.capital = 1000000
 
         #Others
-        self.mustHave=["mode",'backtesting']
+        self.mustHave=["mode"]
 
         update = {}
         for field in self.__dict__:
@@ -108,8 +108,8 @@ class backtestingEngine(object):
         #Set dbcursors
         self.db = self.dbClient[self.dbName]
         self.collection = self.db[self.collectionName]
-        self.dbCursor_init = self.collection.find_many({"Date":{"$gte":int(self.initStartDate),"$lte":int(self.initEndDate)}})
-        self.dbCursor_backtest = self.collection.find_many({"Date":{"$gte":int(self.backtestingStartDate),"$lte":int(self.backtestingEndDate)}})
+        self.dbCursor_init = self.collection.find({"Date":{"$gte":int(self.initStartDate),"$lte":int(self.initEndDate)}})
+        self.dbCursor_backtest = self.collection.find({"Date":{"$gte":int(self.backtestingStartDate),"$lte":int(self.backtestingEndDate)}})
         print("successfully setup db cursors.")
 
     def runBacktesting(self):
@@ -117,8 +117,10 @@ class backtestingEngine(object):
         self.check_setup(self.mustHave)
         self.setup_db()
         if self.mode == self.BAR_MODE:
+            initFunc = self.newInitBar
             func = self.newBar
         elif self.mode == self.TICK_MODE:
+            initFunc = self.newInitTick
             func = self.newTick
         
         #Run backtesting
@@ -126,28 +128,42 @@ class backtestingEngine(object):
         self.trading = True
 
         output("Initing Strategy...")
-        for initBar in self.dbCursor_init:
-            self.strategy.onInitBar(initBar)
+        self.strategy.status = self.strategy.STATUS_INITING
+        for initBarEntry in self.dbCursor_init:
+            initBar = barObject(initBarEntry)
+            initFunc(initBar)
         output("Strategy Inited!")
 
         output("Start replaying data...")
-        for bar in self.dbCursor_backtest:
+        self.strategy.status = self.strategy.STATUS_TRADING
+        for BarEntry in self.dbCursor_backtest:
+            bar = barObject(BarEntry)
+            print(bar.__dict__)
             func(bar)
         output("Finished replaying data.")
         self.trading = False
+    
+    def newInitBar(self,initBar):
+        #The logic of handling a new bar when initing strategy.
+        #Updating the date and time
+        self.bar = initBar
+        self.date = initBar.Date
+        self.time = initBar.Time
+        self.datetime = initBar.datetime
         
+        #Tracking the pop up of a new bar
+        self.tracker.newBar(initBar)
+        #Push the init Bar to strategy
+        self.strategy.onInitBar(initBar)
+
     def newBar(self,bar):
         #The logic of handling a new bar.
         #Updating the date and time.
         self.bar = bar
         self.date = bar.Date
         self.time = bar.Time
-        year = self.date%10000
-        month = self.date%100- year*100
-        day = self.date - year*10000 - month*100
-        hour,minute,second = [int(x) for x in self.time.split(':')]
-        self.datetime = datetime(year,month,day,hour,minute,second)
-        bar.datetime = self.datetime
+        self.datetime = bar.datetime
+
         #Tracking the pop up of the new bar.
         self.tracker.newBar(bar)
         #Triggering the local stop orders.
@@ -156,9 +172,13 @@ class backtestingEngine(object):
         self.crossLimitOrders()
         #Push the new bar to strategy
         self.strategy.onBar(bar)
+        print(self.datetime)
 
     def newTick(self,tick):
         #The logic of handling a new tick.
+        pass
+
+    def newInitTick(self,initTick):
         pass
 
     def triggerStopOrders(self):
@@ -241,94 +261,97 @@ class backtestingEngine(object):
 
     def sendOrder(self,price,volume,orderType,stop=False,feedback=False):
         #logic of sending order
-        try:
-            if stop == False:
-                self.limitOrderCount += 1
-                #send limitOrder
-                #Shaping the limit order parameters
-                order = limitOrder()
-                order.symbol = self.symbol
-                order.exchange = self.exchange
-                order.strategy = self.strategy
-                order.datetimeCreated = self.datetime
-                order.price = price
-                order.orderID = self.limitOrderCount
-                if orderType == ORDERTYPE_BUY:
-                    order.direction = DIRECTION_LONG
-                    order.offset = OFFSET_OPEN
-                    order.orderType = ORDERTYPE_BUY
-                elif orderType == ORDERTYPE_SELL:
-                    order.direction = DIRECTION_SHORT
-                    order.offset = OFFSET_CLOSE
-                    order.orderType = ORDERTYPE_SELL
-                elif orderType == ORDERTYPE_SHORT:
-                    order.direction = DIRECTION_SHORT
-                    order.offset = OFFSET_OPEN
-                    order.orderType = ORDERTYPE_SHORT
-                elif orderType == ORDERTYPE_COVER:
-                    order.direction = DIRECTION_LONG
-                    order.offset = OFFSET_CLOSE
-                    order.orderType = ORDERTYPE_COVER
-                #We should consider bound the close order's volume.
-                if order.offset == ORDERTYPE_SELL:
-                    order.volume = min(self.position_long,volume)
-                elif order.offset == ORDERTYPE_COVER:
-                    order.volume = min(self.position_short,volume)
-                else:
-                    order.volume = volume
-                #Add to workinglimitorder dictionary
-                self.workingLimitOrdersDict[order.orderID] = order
-                #Add tracking infos
-                self.tracker.newLimitOrder(order)
-                if feedback == True:
-                    return FEEDBACK_LIMITORDERSENT
-                else:
-                    pass 
-            elif stop == True:
-                self.stopOrderCount += 1
-                #send stopOrder
-                #First shape a stop order
-                settings = {'soID':self.stopOrderCount,'symbol':self.symbol,'exchange':self.exchange,'strategy':self.strategy,
-                            'datetimeCreated':self.datetime,'price':price,'volume':volume}
-                so = stopOrder(settings_bounded=settings)
-                if orderType == ORDERTYPE_BUY:
-                    so.direction = DIRECTION_LONG
-                    so.offset = OFFSET_OPEN
-                elif orderType == ORDERTYPE_COVER:
-                    so.direction = DIRECTION_LONG
-                    so.offset = OFFSET_CLOSE
-                elif orderType ==ORDERTYPE_SELL:
-                    so.direction = DIRECTION_SHORT
-                    so.offset = OFFSET_CLOSE
-                elif orderType ==ORDERTYPE_SHORT:
-                    so.direction = DIRECTION_SHORT
-                    so.offset = OFFSET_OPEN
-                so.orderType = orderType
-                #then send the order to local dictionary
-                self.workingStopOrdersDict[so.soID] = so
-                #Add tracking infos
-                self.tracker.newStopOrder(so)
-                if feedback == True:
-                    return FEEDBACK_STOPORDERBURIED
-                else:
-                    pass
-        except:
-            self.tracker.orderFailure(self.datetime)
+        if stop == False:
+            self.limitOrderCount += 1
+            #send limitOrder
+            #Shaping the limit order parameters
+            order = limitOrder()
+            order.symbol = self.symbol
+            order.exchange = self.exchange
+            order.strategy = self.strategy
+            order.datetimeCreated = self.datetime
+            order.price = price
+            order.orderID = self.limitOrderCount
+            if orderType == ORDERTYPE_BUY:
+                order.direction = DIRECTION_LONG
+                order.offset = OFFSET_OPEN
+                order.orderType = ORDERTYPE_BUY
+            elif orderType == ORDERTYPE_SELL:
+                order.direction = DIRECTION_SHORT
+                order.offset = OFFSET_CLOSE
+                order.orderType = ORDERTYPE_SELL
+            elif orderType == ORDERTYPE_SHORT:
+                order.direction = DIRECTION_SHORT
+                order.offset = OFFSET_OPEN
+                order.orderType = ORDERTYPE_SHORT
+            elif orderType == ORDERTYPE_COVER:
+                order.direction = DIRECTION_LONG
+                order.offset = OFFSET_CLOSE
+                order.orderType = ORDERTYPE_COVER
+            #We should consider bound the close order's volume.
+            if order.offset == ORDERTYPE_SELL:
+                order.volume = min(self.position_long,volume)
+            elif order.offset == ORDERTYPE_COVER:
+                order.volume = min(self.position_short,volume)
+            else:
+                order.volume = volume
+            #Add to workinglimitorder dictionary
+            self.workingLimitOrdersDict[order.orderID] = order
+            #Add tracking infos
+            self.tracker.newLimitOrder(order)
             if feedback == True:
-                return FEEDBACK_ORDERFAILURE
+                return FEEDBACK_LIMITORDERSENT
+            else:
+                pass 
+        elif stop == True:
+            self.stopOrderCount += 1
+            #send stopOrder
+            #First shape a stop order
+            settings = {'soID':self.stopOrderCount,'symbol':self.symbol,'exchange':self.exchange,'strategy':self.strategy,
+                        'datetimeCreated':self.datetime,'price':price,'volume':volume}
+            so = stopOrder(settings_bounded=settings)
+            if orderType == ORDERTYPE_BUY:
+                so.direction = DIRECTION_LONG
+                so.offset = OFFSET_OPEN
+            elif orderType == ORDERTYPE_COVER:
+                so.direction = DIRECTION_LONG
+                so.offset = OFFSET_CLOSE
+            elif orderType ==ORDERTYPE_SELL:
+                so.direction = DIRECTION_SHORT
+                so.offset = OFFSET_CLOSE
+            elif orderType ==ORDERTYPE_SHORT:
+                so.direction = DIRECTION_SHORT
+                so.offset = OFFSET_OPEN
+            so.orderType = orderType
+            #then send the order to local dictionary
+            self.workingStopOrdersDict[so.soID] = so
+            #Add tracking infos
+            self.tracker.newStopOrder(so)
+            if feedback == True:
+                return FEEDBACK_STOPORDERBURIED
             else:
                 pass
+     #   except:
+     #       self.tracker.orderFailure(self.datetime)
+     #       if feedback == True:
+     #           return FEEDBACK_ORDERFAILURE
+     #       else:
+     #           pass
     
     def cancelOrder(self,orderID,so=False):
         #Cancel a limite order or stop order
         if so == False:
             if orderID in self.workingLimitOrdersDict:
+                self.workingLimitOrdersDict[orderID].status = STATUS_CANCELLED
+                self.workingLimitOrdersDict[orderID].datetimeCancelled = self.datetime
                 del self.workingLimitOrdersDict[orderID]
                 self.tracker.writeLog("Cancel limit order %s successfully."%orderID)
             else:
                 self.tracker.writeLog("Trying to cancel a limit order that does not exist.")
         elif so == True:
             if orderID in self.workingStopOrdersDict:
+                self.workingStopOrdersDict[orderID].status = SOSTATUS_CANCELLED
+                self.workingStopOrdersDict[orderID].datetimeCancelled = self.datetime
                 del self.workingStopOrdersDict[orderID]
                 self.tracker.writeLog("Cancel stop order %s successfully."%orderID)
             else:
@@ -337,8 +360,8 @@ class backtestingEngine(object):
     def cancelAll(self,limit=True,stop=True):
         #Cancel all orders
         if limit == True:
-            for orderID in self.workingLimitOrdersDict:
+            for orderID in list(self.workingLimitOrdersDict):
                 self.cancelOrder(orderID)
         if stop == True:
-            for soID in self.workingStopOrdersDict:
+            for soID in list(self.workingStopOrdersDict):
                 self.cancelOrder(soID,True)

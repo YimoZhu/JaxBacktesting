@@ -8,7 +8,7 @@ os.chdir('D:/Programms/vnpy/examples/CtaBacktesting')
 data = pd.read_csv('IF0000_1min.csv')
 
 data.Date = [int(x.replace('-','')) for x in data.Date]
-data=data[data.Date<20100421]
+data=data[data.Date>=20100421]
 
 #Insert into mongo
 client = pymongo.MongoClient('localhost',27017)
