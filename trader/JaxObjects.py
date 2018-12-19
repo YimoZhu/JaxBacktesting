@@ -13,11 +13,15 @@ class info_tracker(object):
     def __init__(self,settings_bounded={},settings_extended={}):
         self.frequency = None
         self.logger = []
-        self.limitOrderDict = OrderedDict()
-        self.stopOrderDict = OrderedDict()
-        self.historyBars = []
-        self.historyTicks = []
-        self.historyTrade = OrderedDict()
+        
+        self.limitOrderDict = OrderedDict()                 #All of the limit orders that has been placed
+        self.stopOrderDict = OrderedDict()                  #All of the stop orders that has been placed
+
+        self.historyBars = []                               #All of fundamental bars
+        self.historyTicks = []                              #All fundamental ticks
+        self.historyTrade = OrderedDict()                   #All trades happened
+        self.dailyResultDict = OrderedDict()                #Every day's result
+        self.backTestingResult = {}                         #The backtestingresult dictionary calculated by function "calculateBacktestingResult"
 
         update = {}
         for field in self.__dict__:
@@ -35,6 +39,8 @@ class info_tracker(object):
             self.logger.append(appendTime("Prompting a new bar, bar datetime %s %s"%(bar.Date,bar.Time)))
         else:
             self.logger.append(appendTime("Prompting a new bar, bar datetime %s"%bar.Date))
+        #Update daily result.
+        self.updateDailyClose(bar.datetime,bar.Close)
 
     def newLimitOrder(self,order):
         #Track the info of sending a new limit order
@@ -70,6 +76,14 @@ class info_tracker(object):
     def writeLog(self,msg):
         #Write a log into logger
         self.logger.append(appendTime(msg))
+
+    def updateDailyClose(self,dt,close):
+        #Update the daily close price
+        date = dt.date
+        if date in self.dailyResultDict:
+            self.dailyResultDict[date].Close = close
+        else:
+            self.dailyResultDict[date] = dailyResult(date,close)
 
 ##########################################################################################################
 class barObject(object):
@@ -281,3 +295,19 @@ class ArrayManager(object):
         kkup = kkcenter + kkdev*atr
         kkdown = kkcenter - kkdev*atr
         return kkdown,kkcenter,kkup
+
+
+class dailyResult(object):
+    #Trading result of day.
+    def __init__(self,date,closePrice,settings_bounded = {},settings_extended={}):
+        self.date = date
+        self.closePrice = closePrice
+        
+        update = {}
+        for field in self.__dict__:
+            try:
+                update[field] = settings_bounded[field]
+            except:
+                pass
+        self.__dict__.update(update)
+        self.__dict__.update(settings_extended)

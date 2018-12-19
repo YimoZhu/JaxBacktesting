@@ -138,7 +138,6 @@ class backtestingEngine(object):
         self.strategy.status = self.strategy.STATUS_TRADING
         for BarEntry in self.dbCursor_backtest:
             bar = barObject(BarEntry)
-            print(bar.__dict__)
             func(bar)
         output("Finished replaying data.")
         self.trading = False
@@ -171,8 +170,8 @@ class backtestingEngine(object):
         #Cross the newly updated limit orders.
         self.crossLimitOrders()
         #Push the new bar to strategy
-        self.strategy.onBar(bar)
-        print(self.datetime)
+        self.strategy.onBar(bar)    
+        output(msg="New bar at %s"%bar.datetime)
 
     def newTick(self,tick):
         #The logic of handling a new tick.
@@ -365,3 +364,12 @@ class backtestingEngine(object):
         if stop == True:
             for soID in list(self.workingStopOrdersDict):
                 self.cancelOrder(soID,True)
+
+    def showBacktestingResult(self):
+        d = self.backtestingEndDate
+
+    def calculateBacktestingResult(self):
+        """
+        Calculate the backtesting result.
+        """
+        
