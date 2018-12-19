@@ -9,3 +9,14 @@ The trading result calculation is broken down into several parts:
 3. When the result is called to be shown, we start to calculate it.
 4. The calculation process is check the trades one by one and generate "trading result" object. It's exactly the unit for KPI calculation, with entry and exit prices and dates.
 5. After calculating the "trading result", we start to aggregate them one by one and generate all KPI.
+
+
+
+2018.12.18
+The logic for orders' fields "orderType,offset,direction"
+
+orderType determine the other 2.
+     (  4 = 2 × 2  )
+
+When you send orders with offset "close", you can only volume up to current corresponding position.
+The long position and short position is calculated seperately, for the purpose of position locker.(Commission control)

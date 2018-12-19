@@ -180,7 +180,7 @@ class stopOrder(object):
 
 
 #########################################################################################
-class trade(object):
+class tradeObject(object):
     #Characterizing a trade.
     def __init__(self,settings_bounded={},settings_extended={}):
         self.symbol = None

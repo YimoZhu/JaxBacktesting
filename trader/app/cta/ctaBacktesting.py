@@ -6,7 +6,8 @@ from trader.JaxTools import output
 from datetime import datetime
 from collections import OrderedDict
 from trader.JaxConstant import *
-from trader.JaxObjects import info_tracker,limitOrder,stopOrder,trade,barObject
+from trader.JaxObjects import info_tracker,limitOrder,stopOrder,tradeObject,barObject
+import copy
 
 class backtestingEngine(object):
     BAR_MODE = "Bar Mode"
@@ -55,6 +56,7 @@ class backtestingEngine(object):
         self.limitOrderCount = 0
         self.stopOrderCount = 0
         self.tradeCount = 0
+        self.resultCount = 0
         self.workingStopOrdersDict = OrderedDict()
         self.workingLimitOrdersDict = OrderedDict()
 
@@ -232,7 +234,7 @@ class backtestingEngine(object):
                     self.position_short = self.position_short - order.volume
                 #Then shaping a new trade object.
                 self.tradeCount += 1
-                newTrade = trade(settings_bounded=order.__dict__,
+                newTrade = tradeObject(settings_bounded=order.__dict__,
                                  settings_extended={'tradeID':self.tradeCount,'datetimeCreated':self.datetime,'price':price})
             elif sellCrossed:
                 price = max(self.bar.Open,order.price)
@@ -247,7 +249,7 @@ class backtestingEngine(object):
                     self.position_long = self.position_long - order.volume
                 #Shaping a new trade object
                 self.tradeCount += 1
-                newTrade = trade(settings_bounded=order.__dict__,
+                newTrade = tradeObject(settings_bounded=order.__dict__,
                                  settings_extended={'tradeID':self.tradeCount,'datetimeCreated':self.datetime,'price':price})
            
             if buyCrossed|sellCrossed:
@@ -366,10 +368,44 @@ class backtestingEngine(object):
                 self.cancelOrder(soID,True)
 
     def showBacktestingResult(self):
-        d = self.backtestingEndDate
+        #Calculate the backtesting result.
+        self.backtestingEndDate()
+        d = self.tracker.backTestingResult
 
     def calculateBacktestingResult(self):
         """
         Calculate the backtesting result.
         """
-        
+        output("Calculating the backtesting result...")
+
+        resultList = []
+
+        longTradeList = []              #Auxiliary, non-closed long trade
+        shortTradeList = []             #Auxiliary, non-closed short trade
+
+        for tradeID,trade in self.tracker.historyTrade.iteritems():
+            #For each trade, we use the following logic to do open or close matching.
+            """
+                         -----------
+                         |         |
+            ----Long---> |         | <-----Short-----
+                         |         |
+                         -----------
+            """
+            trade = copy.deepcopy(trade)
+            if trade.direction == DIRECTION_LONG:
+                if trade.offset == OFFSET_OPEN:
+                    #If we are opening a new position.
+                    longTradeList.append(trade)
+
+                elif trade.offset == OFFSET_CLOSE:
+                    #If we are closing a short position. We clear the shortTradeList in a FIFO manner.
+                    exitTrade = trade
+                    
+                    while True:
+                        exitTrade = shortTradeList[0]
+
+                        **The offset logic**
+
+                        if exitTrade.volume == 0:
+                            
