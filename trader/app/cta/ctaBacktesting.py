@@ -393,6 +393,7 @@ class backtestingEngine(object):
                          -----------
             """
             trade = copy.deepcopy(trade)
+
             if trade.direction == DIRECTION_LONG:
                 if trade.offset == OFFSET_OPEN:
                     #If we are opening a new position.
@@ -403,9 +404,20 @@ class backtestingEngine(object):
                     exitTrade = trade
                     
                     while True:
-                        exitTrade = shortTradeList[0]
+                        entryTrade = shortTradeList[0]
 
-                        **The offset logic**
+                        #Now we should offset the entry using the exit.
+                        
+
+                        if entryTrade.volume == 0:
+                            #If this entry trade has been used up.
+                            shortTradeList.pop(0)
 
                         if exitTrade.volume == 0:
-                            
+                            #If this exit trade has been used up.
+                            break#Stop iterating
+            
+            if trade.direction == DIRECTION_SHORT:
+                if trade.offset == OFFSET_OPEN:
+
+                        

@@ -205,6 +205,27 @@ class tradeObject(object):
         self.__dict__.update(settings_extended)
 
 
+class tradingResult(object):
+    #Characterizing a trading result.
+    def __init__(self,entryDt,entryPrice,exitDt,exitPrice,volume,direction,settings_bounded={},settings_extended={}):
+        #Constructor
+        self.entryDt = entryDt
+        self.entryPrice = entryPrice
+        self.exitDt = exitDt
+        self.exitPrice = exitPrice
+        self.volume = volume
+        self.direction = direction
+
+        update = {}
+        for field in self.__dict__:
+            try:
+                update[field] = settings_bounded[field]
+            except:
+                pass
+        self.__dict__.update(update)
+        self.__dict__.update(settings_extended)
+
+
 ########################################################################
 class BarGenerator(object):
     #Aggregating minute bar to k-minutes bar.
